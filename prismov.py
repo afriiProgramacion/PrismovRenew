@@ -16,7 +16,7 @@ from reportlab.pdfbase import pdfmetrics
 
 
 # ============================================================
-# RUTAS FIJAS PARA QUE FUNCIONE EN .EXE
+# FIXED PATHS FOR .EXE DEPLOYMENT
 # ============================================================
 
 DATA_DIR = os.path.join(os.getenv("LOCALAPPDATA"), "PRISMOV")
@@ -26,10 +26,17 @@ HISTORIAL_PATH = os.path.join(DATA_DIR, "historial.json")
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 
 # ============================================================
-# CARGA Y GUARDADO DE HISTORIAL
+# HISTORY LOAD AND SAVE (DATA LIFECYCLE - RA 5b)
 # ============================================================
 
 def cargar_historial():
+    """
+    Loads the system's historical THD data from a JSON file.
+    
+    Returns:
+        list: A list of dictionaries containing past snapshots. 
+              Returns an empty list if the file doesn't exist or is corrupted.
+    """
     if not os.path.exists(HISTORIAL_PATH):
         return []
     try:
@@ -40,14 +47,27 @@ def cargar_historial():
         return []
 
 def guardar_historial(historial):
+    """
+    Saves the system's historical data into the persistent JSON file.
+    
+    Args:
+        historial (list): The list of data snapshots to be saved.
+    """
     with open(HISTORIAL_PATH, "w", encoding="utf-8") as f:
         json.dump(historial, f, indent=4, ensure_ascii=False)
 
 # ============================================================
-# CARGA Y GUARDADO DE CONFIGURACIÓN
+# CONFIGURATION LOAD AND SAVE
 # ============================================================
 
 def cargar_config():
+    """
+    Loads the general configuration settings (Telegram, Schedules) from JSON.
+    
+    Returns:
+        dict: A dictionary with the configuration variables, using defaults 
+              for any missing keys.
+    """
     default_config = {
         "chat_id": None,
         "programacion": {},
@@ -100,21 +120,32 @@ def guardar_programacion(nueva_prog):
     guardar_config(config)
 
 # ============================================================
-# CÓDIGO DE VINCULACIÓN DE USUARIOS
+# USER LINKING CODE (SECURITY - RA 5i)
 # ============================================================
 
 def generar_codigo_vinculacion():
-    """Genera un código aleatorio de 6 caracteres para vincular usuarios"""
+    """
+    Generates a random 6-character code for linking users to their Telegram alerts.
+    
+    Returns:
+        str: Alphanumeric 6-character code.
+    """
     caracteres = string.ascii_uppercase + string.digits
     codigo = ''.join(random.choices(caracteres, k=6))
     return codigo
 
 def cargar_codigo_vinculacion():
-    """Carga el código de vinculación actual"""
+    """
+    Retrieves the current linking code from the configuration. 
+    If none exists, it generates and saves a new one.
+    
+    Returns:
+        str: The current 6-character code.
+    """
     config = cargar_config()
     codigo = config.get("codigo_vinculacion")
     
-    # Si no hay código, generar uno nuevo
+    # If no code is present, generate a new one.
     if not codigo:
         codigo = generar_codigo_vinculacion()
         config["codigo_vinculacion"] = codigo
@@ -123,7 +154,12 @@ def cargar_codigo_vinculacion():
     return codigo
 
 def generar_nuevo_codigo():
-    """Genera un nuevo código de vinculación"""
+    """
+    Forces the generation and saving of a new linking code.
+    
+    Returns:
+        str: The newly generated 6-character code.
+    """
     codigo = generar_codigo_vinculacion()
     config = cargar_config()
     config["codigo_vinculacion"] = codigo
@@ -131,6 +167,10 @@ def generar_nuevo_codigo():
     return codigo
 
 def configurar_programacion_consola():
+    """
+    Guides the user through setting up a recurring backup or analysis schedule by prompts.
+    Provides standard JSON formatting validations mapping into Config file.
+    """
     print("\n=== CONFIGURAR PROGRAMACIÓN ===")
 
     dias_validos = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
@@ -229,10 +269,17 @@ def enviar_telegram(mensaje):
         pass
 
 # ============================================================
-# ANÁLISIS DEL SISTEMA
+# SYSTEM ANALYSIS (BUSINESS AND PLANT IMPACT - RA 2e)
 # ============================================================
 
 def analizar_procesos():
+    """
+    Extracts system resource usage snapshot.
+    
+    Returns:
+        list: Sorted processes (descending by RAM consumption). Each dictionary 
+              contains process id, name, cpu_percent, and ram_mb.
+    """
     procesos = []
     for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_info"]):
         try:
@@ -248,7 +295,16 @@ def analizar_procesos():
     return sorted(procesos, key=lambda x: x["ram_mb"], reverse=True)
 
 def analizar_tendencias(historial):
-    """Analiza tendencias en el historial"""
+    """
+    Analyzes systemic trends based on current and historical telemetry.
+    
+    Args:
+        historial (list): The memory logs up to the present.
+        
+    Returns:
+        tuple: (cpu_trend, ram_trend, processes_growing_in_ram)
+               Trends are represented as symbolic strings (↑, ↓, →).
+    """
     if len(historial) < 2:
         return "Datos insuficientes", "Datos insuficientes", []
     
@@ -295,7 +351,16 @@ def analizar_tendencias(historial):
     return tendencia_cpu, tendencia_ram, procesos_crecientes
 
 def detectar_procesos_sospechosos(procesos):
-    """Detecta procesos que consumen recursos anormales"""
+    """
+    Detects irregular high-consumption processes by statistical deviations.
+    
+    Args:
+        procesos (list): Current snapshot of all processes with cpu and ram data.
+        
+    Returns:
+        list: Filtered array containing processes that double the average 
+              RAM threshold or exceed critical CPU.
+    """
     sospechosos = []
     
     # Obtener estadísticas
@@ -330,7 +395,17 @@ def detectar_procesos_sospechosos(procesos):
     return sorted(sospechosos, key=lambda x: x["ram_mb"], reverse=True)
 
 def analisis_avanzado(snapshot, historial):
-    """Análisis avanzado y preciso del sistema"""
+    """
+    Combines basic analysis, mathematical patterns, and history metrics to 
+    draw robust systemic health conclusions and automated recommendations.
+    
+    Args:
+        snapshot (dict): The current execution metrics.
+        historial (list): Historical execution metrics mapping.
+        
+    Returns:
+        dict: Embedded recommendations and risk indicators.
+    """
     tendencia_cpu, tendencia_ram, procesos_crecientes = analizar_tendencias(historial)
     sospechosos = detectar_procesos_sospechosos(snapshot["procesos"])
     
