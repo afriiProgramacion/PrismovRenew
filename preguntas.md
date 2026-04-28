@@ -1,57 +1,57 @@
-# Preguntas y Respuestas - Fase 2: Análisis de Utilidad y Aplicación (PRISMOV)
+# Questions and Answers - Phase 2: Utility and Application Analysis (PRISMOV)
 
-## Criterio 6a) Objetivos estratégicos
-**¿Qué objetivos estratégicos específicos de la empresa aborda tu software?**
-PRISMOV aborda el objetivo estratégico principal de maximizar la eficiencia operativa (OEE) y reducir los tiempos de inactividad no planificados (Downtime). Esto se logra mediante el monitoreo constante de los armónicos (THD) y parámetros críticos en el equipamiento industrial.
-**¿Cómo se alinea el software con la estrategia general de digitalización?**
-Se alinea digitalizando el ciclo de vida del dato (RA 5b) que antes se tomaba manualmente con multímetros, y enviando reportes automáticos mediante bots de mensajería (RA 5i, Telegram) de manera instantánea, democratizando la información de planta (OT) hacia los niveles de decisión de negocio (IT).
+## Criterion 6a) Strategic Objectives
+**What specific strategic objectives does your software address for the company?**
+PRISMOV addresses the main strategic objective of maximizing operational efficiency (OEE) and reducing unplanned downtime. This is achieved through continuous monitoring of harmonics (THD) and critical parameters in industrial equipment.
+**How does the software align with the general digitalization strategy?**
+It aligns by digitalizing the data lifecycle (RA 5b) that was previously collected manually with multimeters, and sending automatic reports via messaging bots (RA 5i, Telegram) instantly, democratizing plant information (OT) to business decision-making levels (IT).
 
-## Criterio 6b) Áreas de negocio y comunicaciones
-**¿Qué áreas de la empresa (producción, negocio, comunicaciones) se ven más beneficiadas con tu software?**
-1. *Producción*: Al recibir alertas preventivas y reportes automáticos, los técnicos de mantenimiento actúan antes de un fallo.
-2. *Negocio/Gerencia*: Al disponer de informes ejecutivos (RA 2g) que traducen fallos THD en impacto financiero.
-3. *Comunicaciones*: Integra a los operadores mediante bots conversacionales seguros, acelerando la toma de decisiones.
-**¿Qué impacto operativo esperas en las operaciones diarias?**
-Una reducción de los cuellos de botella mediante un tiempo medio de respuesta (MTTR) mucho menor y un ahorro de horas de análisis manual de logs en papel.
+## Criterion 6b) Business Areas and Communications
+**Which company areas (production, business, communications) benefit most from your software?**
+1. *Production*: By receiving preventive alerts and automatic reports, maintenance technicians act before a failure occurs.
+2. *Business/Management*: By having executive reports (RA 2g) that translate THD failures into financial impact.
+3. *Communications*: Integrates operators through secure conversational bots, accelerating decision-making.
+**What operational impact do you expect in daily operations?**
+A reduction of bottlenecks through much lower Mean Time To Repair (MTTR) and savings in hours of manual log analysis on paper.
 
-## Criterio 6c) Áreas susceptibles de digitalización
-**¿Qué áreas de la empresa son más susceptibles de ser digitalizadas con tu software?**
-El Área de Mantenimiento Preventivo/Predictivo y el Departamento de Control de Calidad Eléctrica. Estas áreas dependen de lecturas constantes que son fácilmente automatizables mediante el "Modo Automático" de PRISMOV.
-**¿Cómo mejorará la digitalización las operaciones en esas áreas?**
-Permitirá a los operarios programar análisis diarios y semanales ("Configurar programación"), pasando de un modelo "reactivo" (arreglar lo que se rompe) a uno completamente digitalizado y analítico ("preventivo").
+## Criterion 6c) Areas Susceptible to Digitalization
+**Which company areas are most susceptible to being digitalized with your software?**
+The Preventive/Predictive Maintenance Area and the Electrical Quality Control Department. These areas depend on constant readings that are easily automatable through PRISMOV's "Automatic Mode".
+**How will digitalization improve operations in those areas?**
+It will allow operators to schedule daily and weekly analyses ("Configure Scheduling"), transitioning from a "reactive" model (fix what breaks) to one completely digitalized and analytical ("preventive").
 
-## Criterio 6d) Encaje de áreas digitalizadas (AD)
-**¿Cómo interactúan las áreas digitalizadas con las no digitalizadas?**
-Las áreas digitalizadas (Mantenimiento con PRISMOV) generan un "Informe THD" que es exportado (por ejemplo, en PDF o papel si es necesario) a las áreas no digitalizadas (por ejemplo, operarios en línea o contabilidad pura sin ERP).
-**¿Qué soluciones o mejoras propondrías para integrar estas áreas?**
-Propondría una API REST documentada en PRISMOV para que otros sistemas (ERP/CRM) puedan consumir los datos THD generados internamente, forzando la digitalización horizontal de toda la cadena de valor.
+## Criterion 6d) Fit of Digitalized Areas (DA)
+**How do digitalized areas interact with non-digitalized ones?**
+Digitalized areas (Maintenance with PRISMOV) generate a "THD Report" that is exported (for example, in PDF or paper if necessary) to non-digitalized areas (for example, line operators or pure accounting without ERP).
+**What solutions or improvements would you propose to integrate these areas?**
+I would propose a documented REST API in PRISMOV so that other systems (ERP/CRM) can consume THD data generated internally, forcing horizontal digitalization of the entire value chain.
 
-## Criterio 6e) Necesidades presentes y futuras
-**¿Qué necesidades actuales de la empresa resuelve tu software?**
-Resuelve la falta de visibilidad en tiempo real del estado de la maquinaria (monitoreo THD continuo y reporte inmediato en Telegram) y elimina el error humano en la transcripción de datos (ciclo de vida del dato automatizado).
-**Propuestas a futuro (Roadmap)**:
-1. Migración a una App Web Multi-usuario.
-2. Ingesta de datos de múltiples plantas industriales (IoT / Edge computing).
-3. Capacidades de Inteligencia Artificial para el análisis predictivo.
+## Criterion 6e) Present and Future Needs
+**What current company needs does your software resolve?**
+It solves the lack of real-time visibility of machinery status (continuous THD monitoring and immediate reporting on Telegram) and eliminates human error in data transcription (automated data lifecycle).
+**Future Proposals (Roadmap)**:
+1. Migration to a Multi-user Web App.
+2. Data ingestion from multiple industrial plants (IoT / Edge computing).
+3. Artificial Intelligence capabilities for predictive analysis.
 
-## Criterio 6f) Relación con tecnologías
-**¿Qué tecnologías habilitadoras has empleado y cómo impactan en las áreas de la empresa?**
-- **Computación en la Nube / APIs y Bots (Nivel Aplicación)**: Uso de Telegram y cron-jobs en la nube o servidores on-premise (RA 5f). Impacta agilizando las comunicaciones e informes.
-- **Interfaces Gráficas e Informes Dinámicos**: Interfaces PyQt5 con modo oscuro para la visualización humana ergonómica en las plantas.
-**¿Qué beneficios específicos aporta la implantación de estas tecnologías?**
-Interactividad, reducción de fricciones en la adopción del software gracias a una GUI moderna y profesional y disponibilidad de la información asíncrona mediante Telegram.
+## Criterion 6f) Relationship with Technologies
+**What enabling technologies have you employed and how do they impact company areas?**
+- **Cloud Computing / APIs and Bots (Application Level)**: Use of Telegram and cron-jobs in the cloud or on-premise servers (RA 5f). It impacts by streamlining communications and reports.
+- **Graphical Interfaces and Dynamic Reports**: PyQt5 interfaces with dark mode for ergonomic human visualization in plants.
+**What specific benefits does the implementation of these technologies provide?**
+Interactivity, reduction of friction in software adoption thanks to a modern and professional GUI, and availability of asynchronous information via Telegram.
 
-## Criterio 6g) Brechas de seguridad
-**¿Qué posibles brechas de seguridad podrían surgir al implementar tu software?**
-1. Exposición de tokens de API y URLs de base de datos en código fuente visible.
-2. Interceptación de datos en tránsito si los reportes no van cifrados.
-3. Acceso no autorizado de operarios locales a configuraciones del programa.
-**¿Qué medidas concretas propondrías para mitigarlas?**
-Ya implementadas: Desvinculación de Supabase explícita y gestión de códigos únicos de vinculación de un solo uso (Tokenization) para Telegram (RA 5i).
-A implementar: Encriptación en reposo (AES) del archivo `historial.json` y uso de variables de entorno `.env` en lugar de guardar credenciales en el código base.
+## Criterion 6g) Security Gaps
+**What possible security gaps could arise when implementing your software?**
+1. Exposure of API tokens and database URLs in visible source code.
+2. Data interception in transit if reports are not encrypted.
+3. Unauthorized access by local operators to program configurations.
+**What specific measures would you propose to mitigate them?**
+Already implemented: Explicit Supabase disconnection and management of unique one-time linking codes (Tokenization) for Telegram (RA 5i).
+To implement: Encryption at rest (AES) of the `historial.json` file and use of `.env` environment variables instead of saving credentials in the code base.
 
-## Criterio 6h) Tratamiento de datos y análisis
-**¿Cómo se gestionan los datos en tu software y qué metodologías utilizas?**
-Los datos brutos (sensórica) se recogen, formatean, agrupan y se almacenan temporalmente gestionando su ciclo de vida íntegro (RA 5b). Después, algoritmos internos (en `prismov.py`) extraen índices y comparativas de negocio.
-**¿Qué haces para garantizar la calidad y consistencia de los datos?**
-Al usar formatos estandarizados (`.json`) y validaciones previo a la ejecución del análisis o programación de horas (como `QTimeEdit` o `QSpinBox` que fuerzan el intervalo de minutos), se evita la inyección de datos impuros por parte del usuario final.
+## Criterion 6h) Data Management and Analysis
+**How is data managed in your software and what methodologies do you use?**
+Raw data (sensors) is collected, formatted, grouped and stored temporarily, managing its complete lifecycle (RA 5b). Then, internal algorithms (in `prismov.py`) extract indices and business comparisons.
+**What do you do to guarantee data quality and consistency?**
+By using standardized formats (`.json`) and validations prior to analysis execution or scheduling hours (like `QTimeEdit` or `QSpinBox` that enforce minute intervals), injection of impure data by the end user is avoided.
