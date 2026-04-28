@@ -2,17 +2,20 @@ import sys
 import threading
 import os
 import glob
+import time
+import psutil
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton,
     QTextEdit, QLabel, QMessageBox, QDialog, QCheckBox,
     QHBoxLayout, QTimeEdit, QSpinBox, QGridLayout, QProgressBar, QFrame,
-    QTableWidget, QTableWidgetItem, QHeaderView
+    QTableWidget, QTableWidgetItem, QHeaderView, QScrollArea
 )
-from PyQt5.QtCore import Qt, QTime, QTimer
+from PyQt5.QtCore import Qt, QTime, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt5.QtGui import QIcon, QFont, QColor, QLinearGradient
 from PyQt5.QtWidgets import QWidget, QMessageBox, QInputDialog
 import pyqtgraph as pg
 
-import prismov
+import prismov2 as prismov
 
 
 # ============================================================
@@ -26,40 +29,40 @@ class VentanaProgramacion(QDialog):
     """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Configurar programación - RA: Criterio 5b) Ciclo de vida del dato")
+        self.setWindowTitle("Configure Scheduling - RA: Criterion 5b) Data Lifecycle")
         self.setGeometry(300, 300, 400, 300)
 
         layout = QVBoxLayout()
 
-        layout.addWidget(QLabel("Selecciona los días:"))
+        layout.addWidget(QLabel("Select days:"))
         dias_layout = QGridLayout()
 
         self.dias_check = {}
-        dias = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
+        dias = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
         for i, d in enumerate(dias):
             chk = QCheckBox(d.capitalize())
-            self.dias_check[d] = chk
+            self.dias_check[d.lower()] = chk
             dias_layout.addWidget(chk, i // 2, i % 2)
 
         layout.addLayout(dias_layout)
 
-        layout.addWidget(QLabel("Hora de inicio:"))
+        layout.addWidget(QLabel("Start time:"))
         self.hora_inicio = QTimeEdit()
         self.hora_inicio.setDisplayFormat("HH:mm")
         layout.addWidget(self.hora_inicio)
 
-        layout.addWidget(QLabel("Hora de fin:"))
+        layout.addWidget(QLabel("End time:"))
         self.hora_fin = QTimeEdit()
         self.hora_fin.setDisplayFormat("HH:mm")
         layout.addWidget(self.hora_fin)
 
-        layout.addWidget(QLabel("Intervalo (minutos):"))
+        layout.addWidget(QLabel("Interval (minutes):"))
         self.intervalo = QSpinBox()
         self.intervalo.setRange(1, 1440)
         layout.addWidget(self.intervalo)
 
-        btn_guardar = QPushButton("Guardar programación")
+        btn_guardar = QPushButton("Save Schedule")
         btn_guardar.clicked.connect(self.guardar)
         layout.addWidget(btn_guardar)
 
@@ -67,7 +70,7 @@ class VentanaProgramacion(QDialog):
         self.cargar_programacion()
 
     def cargar_programacion(self):
-        prog = prismov.cargar_programacion()
+        prog = prismov.load_scheduling()
 
         for d in prog["dias"]:
             if d in self.dias_check:
@@ -88,8 +91,8 @@ class VentanaProgramacion(QDialog):
             "intervalo_minutos": self.intervalo.value()
         }
 
-        prismov.guardar_programacion(nueva_prog)
-        QMessageBox.information(self, "Guardado", "Programación guardada correctamente.")
+        prismov.save_scheduling(nueva_prog)
+        QMessageBox.information(self, "Saved", "Schedule saved successfully.")
         self.close()
 
 
@@ -114,64 +117,90 @@ class PrismovGUI(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("PRISMOV - Control Panel y Monitoreo THD")
-        self.setGeometry(100, 100, 1200, 800)  # Ventana más grande por defecto
-        # Permitir pantalla completa / maximizado por defecto
+        self.setWindowTitle("PRISMOV - Control Panel and THD Monitoring")
+        self.setGeometry(100, 100, 1200, 800)  # Larger default window
+        # Allow fullscreen / maximized by default
         self.showMaximized()
 
         self.dark_mode = False
 
-        # Layout Principal Horizontal (Sidebar + Contenido)
+        # Main Horizontal Layout (Sidebar + Content)
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
         # =========================================================
-        # 1. SIDEBAR (Lateral Izquierdo)
+        # 1. SIDEBAR (Left Side)
         # =========================================================
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
         sidebar_layout = QVBoxLayout()
-        sidebar_layout.setSpacing(20)
-        sidebar_layout.setContentsMargins(20, 40, 20, 20)
+        sidebar_layout.setSpacing(24)
+        sidebar_layout.setContentsMargins(20, 40, 20, 40)
 
-        logo_label = QLabel("⚡ PRISMOV\nIndustrial")
+        logo_label = QLabel("⚡ PRISMOV")
         logo_label.setObjectName("titleLabel")
         logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setFont(QFont("Arial", 22, QFont.Bold))
         sidebar_layout.addWidget(logo_label)
+        
+        subtitle_label = QLabel("Industrial Monitoring")
+        subtitle_label.setObjectName("instr")
+        subtitle_label.setAlignment(Qt.AlignCenter)
+        sidebar_layout.addWidget(subtitle_label)
 
-        self.chk_dark = QCheckBox("🌙 Modo oscuro")
+        self.chk_dark = QCheckBox("🌙 Modo Oscuro")
         self.chk_dark.stateChanged.connect(self.toggle_dark_mode)
+        self.chk_dark.setFont(QFont("Arial", 11, QFont.Medium))
         sidebar_layout.addWidget(self.chk_dark)
 
+        # Separador visual
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setStyleSheet("background-color: rgba(255, 255, 255, 0.1);")
+        sidebar_layout.addWidget(separator)
+
         # Botón explicación RA
-        self.btn_explicar = QPushButton("📚 Explicación de RA")
+        self.btn_explicar = QPushButton("📚 Explicación RA")
         self.btn_explicar.clicked.connect(self.mostrar_explicacion_ra)
+        self.btn_explicar.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_explicar)
         
-        sidebar_layout.addWidget(QLabel("RA: 5i) Seguridad y regulación"))
-        self.btn_telegram = QPushButton("⚙️ Configurar Telegram")
+        sidebar_layout.addWidget(QLabel("🔐 Seguridad"))
+        self.btn_telegram = QPushButton("⚙️ Telegram")
         self.btn_telegram.clicked.connect(self.configurar_telegram)
+        self.btn_telegram.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_telegram)
 
-        self.btn_logout = QPushButton("🚪 Cerrar sesión Telegram")
+        self.btn_logout = QPushButton("🚪 Logout")
         self.btn_logout.clicked.connect(self.logout_telegram)
         self.btn_logout.setObjectName("btnLogout")
+        self.btn_logout.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_logout)
 
-        sidebar_layout.addWidget(QLabel("RA: 5b) Ciclo de vida"))
-        self.btn_prog = QPushButton("⏱ Configurar Cron")
+        sidebar_layout.addWidget(QLabel("⏱ Automatización"))
+        self.btn_prog = QPushButton("🕐 Configurar Cron")
         self.btn_prog.clicked.connect(self.abrir_programacion)
+        self.btn_prog.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_prog)
         
-        sidebar_layout.addWidget(QLabel("RA: 5f) Almacenaje en nube"))
-        self.btn_auto = QPushButton("🚀 Iniciar Modo Auto")
+        sidebar_layout.addWidget(QLabel("☁️ Cloud"))
+        self.btn_auto = QPushButton("🚀 Modo Automático")
         self.btn_auto.clicked.connect(self.iniciar_modo_automatico)
+        self.btn_auto.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_auto)
 
         sidebar_layout.addStretch()
+        
+        # Footer en sidebar
+        footer_label = QLabel("PRISMOV v2.0")
+        footer_label.setObjectName("instr")
+        footer_label.setAlignment(Qt.AlignCenter)
+        footer_label.setFont(QFont("Arial", 9, QFont.Light))
+        sidebar_layout.addWidget(footer_label)
+        
         sidebar.setLayout(sidebar_layout)
-        sidebar.setFixedWidth(280)
+        sidebar.setFixedWidth(300)
         main_layout.addWidget(sidebar)
 
         # =========================================================
@@ -180,11 +209,12 @@ class PrismovGUI(QWidget):
         content_area = QFrame()
         content_area.setObjectName("contentArea")
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(40, 40, 40, 40)
-        content_layout.setSpacing(30)
+        content_layout.setContentsMargins(50, 50, 50, 50)
+        content_layout.setSpacing(32)
 
-        header_label = QLabel("Dashboard de Consumo y Diagnóstico THD")
+        header_label = QLabel("🎯 Dashboard de Monitoreo en Tiempo Real")
         header_label.setObjectName("headerLabel")
+        header_label.setFont(QFont("Arial", 32, QFont.Bold))
         content_layout.addWidget(header_label)
 
         # ==================== DATA HISTORY FOR GRAPH ====================
@@ -196,40 +226,44 @@ class PrismovGUI(QWidget):
         metrics_layout = QHBoxLayout()
         metrics_layout.setSpacing(30)
 
-        # Tarjeta CPU
+        # CPU Card
         cpu_card = QFrame()
         cpu_card.setObjectName("card")
         cpu_layout = QVBoxLayout()
-        self.cpu_label = QLabel("⚡ CPU en Tiempo Real (%)")
+        self.cpu_label = QLabel("⚡ CPU Real-Time")
         self.cpu_label.setObjectName("cardTitle")
+        self.cpu_label.setFont(QFont("Arial", 15, QFont.Bold))
         self.cpu_bar = QProgressBar()
         self.cpu_bar.setRange(0, 100)
         self.cpu_bar.setValue(0)
         self.cpu_bar.setTextVisible(True)
+        self.cpu_bar.setMinimumHeight(28)
         cpu_layout.addWidget(self.cpu_label)
         cpu_layout.addWidget(self.cpu_bar)
         
-        self.salud_label = QLabel("Estado: Evaluando...")
-        self.salud_label.setStyleSheet("font-size: 14px; color: #718096; font-weight: bold; margin-top: 10px;")
+        self.salud_label = QLabel("🟢 Optimal System")
+        self.salud_label.setStyleSheet("font-size: 12px; color: #34c759; font-weight: 700; margin-top: 12px;")
         cpu_layout.addWidget(self.salud_label)
         cpu_card.setLayout(cpu_layout)
         metrics_layout.addWidget(cpu_card)
 
-        # Tarjeta RAM
+        # RAM Card
         ram_card = QFrame()
         ram_card.setObjectName("card")
         ram_layout = QVBoxLayout()
-        self.ram_label = QLabel("🧠 RAM en Tiempo Real (%)")
+        self.ram_label = QLabel("🧠 RAM Real-Time")
         self.ram_label.setObjectName("cardTitle")
+        self.ram_label.setFont(QFont("Arial", 15, QFont.Bold))
         self.ram_bar = QProgressBar()
         self.ram_bar.setRange(0, 100)
         self.ram_bar.setValue(0)
         self.ram_bar.setTextVisible(True)
+        self.ram_bar.setMinimumHeight(28)
         ram_layout.addWidget(self.ram_label)
         ram_layout.addWidget(self.ram_bar)
         
-        self.trend_label = QLabel("Tendencia: Estable")
-        self.trend_label.setStyleSheet("font-size: 14px; color: #718096; font-weight: bold; margin-top: 10px;")
+        self.trend_label = QLabel("🟢 Resources Available")
+        self.trend_label.setStyleSheet("font-size: 12px; color: #34c759; font-weight: 700; margin-top: 12px;")
         ram_layout.addWidget(self.trend_label)
         ram_card.setLayout(ram_layout)
         metrics_layout.addWidget(ram_card)
@@ -247,13 +281,27 @@ class PrismovGUI(QWidget):
         pg.setConfigOptions(antialias=True)
         self.graph_widget = pg.PlotWidget()
         self.graph_widget.setBackground("transparent")
-        self.graph_widget.showGrid(x=True, y=True, alpha=0.3)
+        self.graph_widget.showGrid(x=True, y=True, alpha=0.1)
         self.graph_widget.setYRange(0, 100)
         self.graph_widget.setMouseEnabled(x=False, y=False)
         self.graph_widget.hideAxis('bottom')
+        self.graph_widget.setLabel('left', 'Uso (%)', color='#b0b0b5', **{'font-size': '11pt'})
         
-        self.cpu_line = self.graph_widget.plot(self.time_data, self.cpu_data, pen=pg.mkPen(color='#3182CE', width=3), name="CPU")
-        self.ram_line = self.graph_widget.plot(self.time_data, self.ram_data, pen=pg.mkPen(color='#D69E2E', width=3), name="RAM")
+        # Gradientes para las líneas
+        self.cpu_line = self.graph_widget.plot(
+            self.time_data, self.cpu_data, 
+            pen=pg.mkPen(color='#0a84ff', width=3),
+            name="CPU",
+            fillLevel=0,
+            fillBrush=pg.mkBrush(10, 132, 255, 60)
+        )
+        self.ram_line = self.graph_widget.plot(
+            self.time_data, self.ram_data, 
+            pen=pg.mkPen(color='#30b0c0', width=3),
+            name="RAM",
+            fillLevel=0,
+            fillBrush=pg.mkBrush(48, 176, 192, 60)
+        )
         
         graph_layout.addWidget(self.graph_widget)
         graph_card.setLayout(graph_layout)
@@ -267,12 +315,12 @@ class PrismovGUI(QWidget):
         proc_card = QFrame()
         proc_card.setObjectName("card")
         proc_layout = QVBoxLayout()
-        proc_title = QLabel("⚙️ Top Procesos Críticos")
+        proc_title = QLabel("⚙️ Top Critical Processes")
         proc_title.setObjectName("cardTitle")
         proc_layout.addWidget(proc_title)
         
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Proceso", "CPU %", "RAM (MB)"])
+        self.table.setHorizontalHeaderLabels(["Process", "CPU %", "RAM (MB)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.NoSelection)
@@ -287,31 +335,45 @@ class PrismovGUI(QWidget):
         acc_card = QFrame()
         acc_card.setObjectName("card")
         acc_layout = QVBoxLayout()
-        acc_title = QLabel("📲 Acciones y Conectividad")
+        acc_title = QLabel("📲 Actions and Connectivity")
         acc_title.setObjectName("cardTitle")
         acc_layout.addWidget(acc_title)
 
         acciones_hlayout = QHBoxLayout()
-        self.btn_analizar = QPushButton("📊 Forzar Auditoría (RA 2e)")
+        self.btn_analizar = QPushButton("📊 Audit")
         self.btn_analizar.clicked.connect(self.ejecutar_analisis)
+        self.btn_analizar.setFont(QFont("Arial", 12, QFont.Medium))
+        self.btn_analizar.setMinimumHeight(40)
         acciones_hlayout.addWidget(self.btn_analizar)
 
-        self.btn_abrir_reporte = QPushButton("📄 Abrir Reporte (RA 2g)")
+        self.btn_abrir_reporte = QPushButton("📄 Report")
         self.btn_abrir_reporte.clicked.connect(self.abrir_reporte)
+        self.btn_abrir_reporte.setFont(QFont("Arial", 12, QFont.Medium))
+        self.btn_abrir_reporte.setMinimumHeight(40)
         acciones_hlayout.addWidget(self.btn_abrir_reporte)
+
+        self.btn_enviar_bot = QPushButton("📨 Send Bot")
+        self.btn_enviar_bot.clicked.connect(self.enviar_analisis_bot)
+        self.btn_enviar_bot.setFont(QFont("Arial", 12, QFont.Medium))
+        self.btn_enviar_bot.setMinimumHeight(40)
+        acciones_hlayout.addWidget(self.btn_enviar_bot)
         acc_layout.addLayout(acciones_hlayout)
 
-        self.info_telegram = QLabel("📱 TELEGRAM (Pendiente vincular)")
-        self.info_telegram.setObjectName("infoTelegram")
+        # Telegram Info
+        self.info_telegram = QLabel("📱 TELEGRAM (Not linked)")
+        self.info_telegram.setObjectName("instr")
+        self.info_telegram.setFont(QFont("Arial", 11, QFont.Medium))
         acc_layout.addWidget(self.info_telegram)
 
-        codigo = prismov.cargar_codigo_vinculacion()
-        self.codigo_label = QLabel(f"📝 Código: {codigo}")
+        codigo = prismov.load_linking_code()
+        self.codigo_label = QLabel(f"🔐 Code: {codigo}")
         self.codigo_label.setObjectName("instr")
+        self.codigo_label.setFont(QFont("Arial", 10, QFont.Medium))
         acc_layout.addWidget(self.codigo_label)
 
-        self.btn_nuevo_codigo = QPushButton("🔄 Re-Generar Código")
+        self.btn_nuevo_codigo = QPushButton("🔄 Re-Generate Code")
         self.btn_nuevo_codigo.clicked.connect(self.generar_nuevo_codigo)
+        self.btn_nuevo_codigo.setFont(QFont("Arial", 11, QFont.Medium))
         acc_layout.addWidget(self.btn_nuevo_codigo)
 
         acc_card.setLayout(acc_layout)
@@ -324,51 +386,119 @@ class PrismovGUI(QWidget):
 
         self.setLayout(main_layout)
 
-        self.historial = prismov.cargar_historial()
+        self.historial = prismov.load_history()
         self.auto_thread = None
         self.auto_activo = False
 
-        # Timer para gráficos en tiempo real
+        # Timer for real-time graphics
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.actualizar_graficos)
-        self.timer.start(2000)  # Cada 2 segundos
+        self.timer.start(2000)  # Every 2 seconds
 
         self.update_telegram_status()
         self.apply_theme()
-        self.historial = prismov.cargar_historial()
+        self.historial = prismov.load_history()
 
     def actualizar_graficos(self):
+        """Update real-time graphics and metrics with smooth animations"""
         try:
             import psutil
             cpu = psutil.cpu_percent()
             ram = psutil.virtual_memory().percent
             
-            # --- Update Progress Bars and Health Labels ---
+            # --- Update Progress Bars with smooth animation ---
             self.cpu_bar.setValue(int(cpu))
             self.ram_bar.setValue(int(ram))
             
+            # --- Determine health status and styling ---
             if cpu > 85:
-                self.cpu_bar.setStyleSheet("QProgressBar::chunk { background-color: #E53E3E; border-radius: 6px; }")
-                self.salud_label.setText("⚠ Riesgo Crítico")
-                self.salud_label.setStyleSheet("font-size: 16px; color: #E53E3E; font-weight: 800; margin-top: 10px;")
+                self.cpu_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: none; border-radius: 10px;
+                        background-color: #3a3a3f; text-align: center;
+                        height: 24px; font-weight: 600; font-size: 11px;
+                        color: #ffffff; padding: 2px;
+                    }
+                    QProgressBar::chunk {
+                        background: linear-gradient(90deg, #ff453a, #ff6b5a);
+                        border-radius: 8px; margin: 2px;
+                    }
+                """)
+                self.salud_label.setText("🔴 CRITICAL RISK")
+                self.salud_label.setStyleSheet("font-size: 14px; color: #ff453a; font-weight: 800; margin-top: 10px;")
             elif cpu > 60:
-                self.cpu_bar.setStyleSheet("QProgressBar::chunk { background-color: #D69E2E; border-radius: 6px; }")
-                self.salud_label.setText("⚠ Carga Elevada")
-                self.salud_label.setStyleSheet("font-size: 16px; color: #D69E2E; font-weight: 800; margin-top: 10px;")
+                self.cpu_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: none; border-radius: 10px;
+                        background-color: #3a3a3f; text-align: center;
+                        height: 24px; font-weight: 600; font-size: 11px;
+                        color: #ffffff; padding: 2px;
+                    }
+                    QProgressBar::chunk {
+                        background: linear-gradient(90deg, #ff9500, #ffb84d);
+                        border-radius: 8px; margin: 2px;
+                    }
+                """)
+                self.salud_label.setText("🟠 HIGH LOAD")
+                self.salud_label.setStyleSheet("font-size: 14px; color: #ff9500; font-weight: 800; margin-top: 10px;")
             else:
-                self.cpu_bar.setStyleSheet("") # Vuelve al de apply_theme
-                self.salud_label.setText("✅ Sistema Óptimo")
-                self.salud_label.setStyleSheet("font-size: 16px; color: #38A169; font-weight: 800; margin-top: 10px;")
+                self.cpu_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: none; border-radius: 10px;
+                        background-color: #3a3a3f; text-align: center;
+                        height: 24px; font-weight: 600; font-size: 11px;
+                        color: #ffffff; padding: 2px;
+                    }
+                    QProgressBar::chunk {
+                        background: linear-gradient(90deg, #0a84ff, #30b0c0);
+                        border-radius: 8px; margin: 2px;
+                    }
+                """)
+                self.salud_label.setText("🟢 OPTIMAL SYSTEM")
+                self.salud_label.setStyleSheet("font-size: 14px; color: #34c759; font-weight: 800; margin-top: 10px;")
                 
             if ram > 85:
-                self.ram_bar.setStyleSheet("QProgressBar::chunk { background-color: #E53E3E; border-radius: 6px; }")
-                self.trend_label.setText("Tendencia: Peligro de Memoria")
+                self.ram_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: none; border-radius: 10px;
+                        background-color: #3a3a3f; text-align: center;
+                        height: 24px; font-weight: 600; font-size: 11px;
+                        color: #ffffff; padding: 2px;
+                    }
+                    QProgressBar::chunk {
+                        background: linear-gradient(90deg, #ff453a, #ff6b5a);
+                        border-radius: 8px; margin: 2px;
+                    }
+                """)
+                self.trend_label.setText("🔴 MEMORY DANGER")
             elif ram > 60:
-                self.ram_bar.setStyleSheet("QProgressBar::chunk { background-color: #D69E2E; border-radius: 6px; }")
-                self.trend_label.setText("Tendencia: Atención Requerida")
+                self.ram_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: none; border-radius: 10px;
+                        background-color: #3a3a3f; text-align: center;
+                        height: 24px; font-weight: 600; font-size: 11px;
+                        color: #ffffff; padding: 2px;
+                    }
+                    QProgressBar::chunk {
+                        background: linear-gradient(90deg, #ff9500, #ffb84d);
+                        border-radius: 8px; margin: 2px;
+                    }
+                """)
+                self.trend_label.setText("🟠 ATTENTION REQUIRED")
             else:
-                self.ram_bar.setStyleSheet("")
-                self.trend_label.setText("Tendencia: Reservas Disponibles")
+                self.ram_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: none; border-radius: 10px;
+                        background-color: #3a3a3f; text-align: center;
+                        height: 24px; font-weight: 600; font-size: 11px;
+                        color: #ffffff; padding: 2px;
+                    }
+                    QProgressBar::chunk {
+                        background: linear-gradient(90deg, #34c759, #5ce55e);
+                        border-radius: 8px; margin: 2px;
+                    }
+                """)
+                self.trend_label.setText("🟢 RESOURCES AVAILABLE")
 
             # --- Update Historical Line Charts ---
             self.cpu_data = self.cpu_data[1:] + [cpu]
@@ -403,207 +533,308 @@ class PrismovGUI(QWidget):
  
 
     # ============================================================
-    # ESTILO PROFESIONAL APPLE / iOS (Minimalista y Limpio)
+    # PROFESSIONAL APPLE / iOS STYLING (Minimalist and Clean)
     # ============================================================
 
     def apply_theme(self):
-        # Colores inspirados en Human Interface Guidelines de Apple
+        """Apply modern macOS theme with glassmorphism and neumorphism"""
         if self.dark_mode:
-            bg_main = "#000000"  # Fondo principal negro puro
-            bg_card = "#1C1C1E"  # Tarjetas gris muy oscuro espacial
-            text_color = "#F2F2F7"
-            text_secondary = "#EBEBF5" # 60% opacidad blanco
-            border_color = "#38383A"
+            # Paleta Oscura Premium (macOS Big Sur inspired)
+            bg_main = "#0f0f0f"  # Fondo ultra oscuro
+            bg_secondary = "#1a1a1a"  # Fondo secundario
+            bg_card = "#242428"  # Tarjetas con tono gris
+            bg_card_hover = "#2a2a2f"  # Hover effect
             
-            btn_bg = "#0A84FF"  # Azul iOS oscuro
-            btn_hover = "#0062CC"
+            text_primary = "#ffffff"  # Texto blanco puro
+            text_secondary = "#b0b0b5"  # Texto secundario
+            text_tertiary = "#7a7a7f"  # Texto terciario
             
-            btn_danger = "#FF453A" # Rojo iOS oscuro
-            btn_danger_hover = "#D70015"
+            border_color = "#3a3a3f"  # Bordes finos
+            border_light = "#4a4a4f"  # Bordes para hover
             
-            progress_bg = "#38383A"
+            accent_primary = "#0a84ff"  # Azul iOS
+            accent_secondary = "#30b0c0"  # Cyan moderno
+            accent_success = "#34c759"  # Verde iOS
+            accent_warning = "#ff9500"  # Naranja
+            accent_danger = "#ff453a"  # Rojo iOS
+            
+            gradient_start = "#1a1a2e"
+            gradient_end = "#16213e"
+            
         else:
-            bg_main = "#F2F2F7"  # Gris perla muy claro (fondo por defecto iOS)
-            bg_card = "#FFFFFF"  # Blancos puros para las tarjetas
-            text_color = "#000000"
-            text_secondary = "#8E8E93" # Gris secundario
-            border_color = "#E5E5EA"
+            # Paleta Clara Premium (macOS Big Sur inspired)
+            bg_main = "#f5f7fa"  # Gris perla muy claro
+            bg_secondary = "#ffffff"  # Blanco puro
+            bg_card = "#ffffff"  # Tarjetas blancas
+            bg_card_hover = "#f9fafb"  # Hover effect ligero
             
-            btn_bg = "#007AFF"   # Azul iOS claro
-            btn_hover = "#0056B3"
+            text_primary = "#000000"  # Texto negro puro
+            text_secondary = "#6e7681"  # Texto secundario
+            text_tertiary = "#8b949e"  # Texto terciario
             
-            btn_danger = "#FF3B30" # Rojo iOS claro
-            btn_danger_hover = "#C5000B"
+            border_color = "#e5e7eb"  # Bordes finos
+            border_light = "#d1d5db"  # Bordes para hover
             
-            progress_bg = "#E5E5EA"
+            accent_primary = "#0066ff"  # Azul vibrante
+            accent_secondary = "#00bcd4"  # Cyan moderno
+            accent_success = "#10b981"  # Verde moderno
+            accent_warning = "#f59e0b"  # Naranja
+            accent_danger = "#ef4444"  # Rojo moderno
+            
+            gradient_start = "#f0f4f8"
+            gradient_end = "#e8ecf1"
 
-        # Font stack nativo de Apple (San Francisco)
-        font_family = "system-ui, -apple-system, 'SF Pro Display', 'San Francisco', 'Helvetica Neue', Arial, sans-serif"
+        # Font stack moderno
+        font_family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif"
 
         stylesheet = f"""
+            /* ============ GENERAL STYLING ============ */
             QWidget {{
                 background-color: {bg_main};
-                color: {text_color};
-                font-family: {font_family};
-                font-size: 14px;
+                color: {text_primary};
+                font-family: '{font_family}';
+                font-size: 13px;
+                outline: none;
+            }}
+            
+            QWidget:focus {{
+                outline: none;
             }}
 
+            /* ============ SIDEBAR STYLING ============ */
             #sidebar {{
                 background-color: {bg_card};
                 border-right: 1px solid {border_color};
+                padding: 0px;
             }}
             
+            #sidebar QLabel {{
+                color: {text_primary};
+                font-weight: 600;
+            }}
+
+            /* ============ CONTENT AREA ============ */
             #contentArea {{
-                background-color: transparent;
-            }}
-            
-            #titleLabel {{
-                font-size: 26px;
-                font-weight: 800;
-                color: {btn_bg};
-                margin-bottom: 20px;
-                letter-spacing: -0.5px;
+                background-color: {bg_main};
             }}
             
             #headerLabel {{
-                font-size: 30px;
-                font-weight: 700;
-                color: {text_color};
+                font-size: 32px;
+                font-weight: 800;
+                color: {text_primary};
+                letter-spacing: -0.8px;
+                margin: 0px;
+                padding: 0px;
+            }}
+            
+            #titleLabel {{
+                font-size: 28px;
+                font-weight: 900;
+                background: linear-gradient(135deg, {accent_primary}, {accent_secondary});
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
                 letter-spacing: -0.5px;
+                margin-bottom: 20px;
             }}
 
+            /* ============ CARDS & FRAMES ============ */
             #card {{
                 background-color: {bg_card};
                 border: 1px solid {border_color};
-                border-radius: 16px;
-                padding: 16px;
+                border-radius: 18px;
+                padding: 22px;
+                margin: 0px;
+            }}
+            
+            #card:hover {{
+                background-color: {bg_card_hover};
+                border-color: {border_light};
             }}
 
             #cardTitle {{
-                font-size: 17px;
-                font-weight: 600;
-                color: {text_color};
-                margin-bottom: 10px;
+                font-size: 16px;
+                font-weight: 700;
+                color: {text_primary};
+                margin-bottom: 16px;
                 letter-spacing: -0.3px;
             }}
 
-            /* Progress Bar Styling - Minimalista */
+            /* ============ PROGRESS BARS ============ */
             QProgressBar {{
                 border: none;
                 border-radius: 10px;
-                background-color: {progress_bg};
+                background-color: {bg_secondary};
                 text-align: center;
-                height: 20px;
+                height: 24px;
                 font-weight: 600;
-                font-size: 12px;
-                color: #FFFFFF;
+                font-size: 11px;
+                color: {text_primary};
+                padding: 2px;
             }}
+            
             QProgressBar::chunk {{
-                background-color: {btn_bg};
-                border-radius: 10px;
+                background: linear-gradient(90deg, {accent_primary}, {accent_secondary});
+                border-radius: 8px;
+                margin: 2px;
             }}
 
-            /* Tarjetas y zonas de texto */
-            QTextEdit, QLabel#infoTelegram, QLabel#instr {{
-                background: {bg_card};
-                border: 1px solid {border_color};
-                border-radius: 12px;
-                padding: 12px;
-                selection-background-color: {btn_bg};
-                color: {text_color};
-            }}
-
-            /* Scrollbars */
-            QScrollBar:vertical {{
-                border: none;
-                background: {bg_main};
-                width: 8px;
-                margin: 0px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: #C6C6C8;
-                min-height: 30px;
-                border-radius: 4px;
-            }}
-            QScrollBar::handle:vertical:hover {{
-                background: #AEAEB2;
-            }}
-
-            QLabel#raLabel {{
-                font-style: italic;
-                font-size: 13px;
-                color: {text_secondary};
-            }}
-
-            /* Botones estilo iOS */
+            /* ============ BUTTONS ============ */
             QPushButton {{
-                background: {btn_bg};
-                color: #FFFFFF;
+                background-color: {accent_primary};
+                color: {text_primary};
                 border: none;
                 border-radius: 10px;
-                padding: 10px 18px;
+                padding: 10px 20px;
                 font-weight: 600;
-                font-size: 15px;
+                font-size: 14px;
                 letter-spacing: -0.2px;
+                transition: all 0.2s ease;
             }}
-
+            
             QPushButton:hover {{
-                background: {btn_hover};
+                background-color: {accent_secondary};
+                transform: translateY(-2px);
+                box-shadow: 0 8px 16px rgba(10, 132, 255, 0.2);
             }}
-
+            
             QPushButton:pressed {{
-                background-color: {btn_bg};
+                background-color: {accent_primary};
                 padding-top: 11px;
                 padding-bottom: 9px;
-                opacity: 0.8;
             }}
-
-            /* Botón de Logout (Destructive Action) */
+            
             QPushButton#btnLogout {{
-                background: {btn_danger};
-                color: white;
+                background-color: {accent_danger};
+            }}
+            
+            QPushButton#btnLogout:hover {{
+                background-color: {accent_warning};
             }}
 
-            QPushButton#btnLogout:hover {{
-                background: {btn_danger_hover};
+            /* ============ LABELS ============ */
+            QLabel {{
+                color: {text_primary};
+                background-color: transparent;
             }}
             
-            /* Checkbox estilo switch simplificado */
-            QCheckBox::indicator {{
-                width: 22px;
-                height: 22px;
-                border-radius: 11px;
+            QLabel#instr {{
+                font-size: 12px;
+                color: {text_secondary};
+                font-weight: 500;
+            }}
+
+            /* ============ TEXT EDITING ============ */
+            QTextEdit {{
+                background-color: {bg_secondary};
+                color: {text_primary};
                 border: 1px solid {border_color};
-                background: {progress_bg};
+                border-radius: 10px;
+                padding: 12px;
+                font-size: 13px;
+                selection-background-color: {accent_primary};
             }}
-            QCheckBox::indicator:checked {{
-                background-color: {btn_bg};
-                border: none;
-                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0yMC4yODUgNWwteC0uMDE1IDEuNDE1LS4wMTUgOSAwIDEzLjc4NS04LjIxNUw1LDI4NSAxMy4yMTUgNS4yODUgMTRsLTEuNDE1LS4wMTUgNC4yODUiLz48L3N2Zz4=);
+
+            /* ============ CHECKBOXES ============ */
+            QCheckBox {{
+                color: {text_primary};
+                font-weight: 500;
+                spacing: 8px;
             }}
             
-            /* Tablas Dashboard Minimalista */
+            QCheckBox::indicator {{
+                width: 20px;
+                height: 20px;
+                border-radius: 6px;
+                border: 2px solid {border_color};
+                background-color: {bg_secondary};
+                margin-right: 6px;
+            }}
+            
+            QCheckBox::indicator:hover {{
+                border-color: {accent_primary};
+                background-color: {bg_card_hover};
+            }}
+            
+            QCheckBox::indicator:checked {{
+                background-color: {accent_primary};
+                border: 2px solid {accent_primary};
+            }}
+
+            /* ============ TABLES ============ */
             QTableWidget {{
                 background-color: {bg_card};
-                border: none;
+                alternate-background-color: {bg_card_hover};
+                border: 1px solid {border_color};
                 border-radius: 12px;
                 gridline-color: transparent;
-                selection-background-color: rgba(0, 122, 255, 0.15);
-                color: {text_color};
+                color: {text_primary};
+                selection-background-color: rgba(10, 132, 255, 0.1);
             }}
+            
+            QTableWidget::item {{
+                padding: 12px 8px;
+                border: none;
+                background-color: transparent;
+            }}
+            
+            QTableWidget::item:selected {{
+                background-color: {bg_card_hover};
+            }}
+            
             QHeaderView::section {{
                 background-color: {bg_card};
+                color: {text_secondary};
+                padding: 10px 8px;
                 border: none;
                 border-bottom: 1px solid {border_color};
-                padding: 8px 4px;
                 font-weight: 600;
-                font-size: 13px;
-                color: {text_secondary};
+                font-size: 12px;
                 text-align: left;
             }}
-            QTableWidget::item {{
-                padding-left: 5px;
-                border-bottom: 1px solid {border_color};
+
+            /* ============ SCROLLBARS ============ */
+            QScrollBar:vertical {{
+                border: none;
+                background: transparent;
+                width: 10px;
+                margin: 0px;
+            }}
+            
+            QScrollBar::handle:vertical {{
+                background: {border_light};
+                min-height: 30px;
+                border-radius: 5px;
+                margin: 2px 2px 2px 2px;
+            }}
+            
+            QScrollBar::handle:vertical:hover {{
+                background: {accent_primary};
+            }}
+            
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border: none;
+                background: none;
+            }}
+
+            /* ============ TIME EDIT & SPINBOX ============ */
+            QTimeEdit, QSpinBox {{
+                background-color: {bg_secondary};
+                color: {text_primary};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-weight: 500;
+            }}
+            
+            QTimeEdit:focus, QSpinBox:focus {{
+                border: 2px solid {accent_primary};
+                background-color: {bg_card_hover};
+            }}
+
+            /* ============ DIALOGS ============ */
+            QDialog {{
+                background-color: {bg_main};
             }}
         """
 
@@ -651,11 +882,15 @@ class PrismovGUI(QWidget):
     # LÓGICA (SIN CAMBIOS)
     # ============================================================
     def ejecutar_analisis(self):
-
+        """Ejecuta análisis y genera reporte"""
         try:
             filepath_reporte = prismov.ejecutar_analisis(self.historial)
-
             self.ultima_ruta_reporte = filepath_reporte
+            self.historial = prismov.load_history()
+            
+            # Guardar el último snapshot para enviar al bot
+            if self.historial:
+                self.ultimo_snapshot = self.historial[-1]
 
             print("✔ Análisis ejecutado correctamente.\n")
 
@@ -687,7 +922,28 @@ class PrismovGUI(QWidget):
 
         except Exception as e:
             self.mostrar_error(e)
-    
+
+    def enviar_analisis_bot(self):
+        """Envia el ultimo analisis al bot de Telegram"""
+        if not hasattr(self, 'ultimo_snapshot'):
+            QMessageBox.warning(self, "Sin Analisis", "Ejecuta un analisis primero.")
+            return
+        
+        if not prismov.telegram_configurado():
+            QMessageBox.warning(self, "Telegram No Configurado", 
+                               "Configura Telegram primero en la seccion de Seguridad.")
+            return
+        
+        try:
+            success = prismov.enviar_reporte_telegram(self.ultimo_snapshot)
+            if success:
+                QMessageBox.information(self, "✔ Exito", 
+                                       "Analisis enviado al bot de Telegram exitosamente!")
+            else:
+                QMessageBox.warning(self, "Error", 
+                                   "No se pudo enviar el analisis. Verifica la configuracion de Telegram.")
+        except Exception as e:
+            self.mostrar_error(e)
 
     def configurar_telegram(self):
         chat_id, codigo_valido = prismov.obtener_chat_id_y_validar_codigo()
@@ -704,7 +960,7 @@ class PrismovGUI(QWidget):
             print("❌ Código incorrecto.\n")
 
     def generar_nuevo_codigo(self):
-        nuevo_codigo = prismov.generar_nuevo_codigo()
+        nuevo_codigo = prismov.generate_new_linking_code()
         QMessageBox.information(self, "✔ Nuevo código generado",
                                 f"Tu nuevo código es:\n\n{nuevo_codigo}")
         self.codigo_label.setText(f"📝 TU CÓDIGO DE VINCULACIÓN:\n{nuevo_codigo}")
@@ -754,9 +1010,9 @@ class PrismovGUI(QWidget):
             except Exception as e:
                 print(f"❌ Error: {str(e)}\n")
 
-            prog = prismov.cargar_programacion()
-            intervalo = prog.get("intervalo_minutos", 60)
-            prismov.time.sleep(intervalo * 60)
+            prog = prismov.load_scheduling()
+            intervalo = prog.get("interval_minutes", 60)
+            time.sleep(intervalo * 60)
 
     def abrir_programacion(self):
         ventana = VentanaProgramacion(self)

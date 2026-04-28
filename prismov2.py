@@ -231,40 +231,41 @@ def configurar_programacion_consola():
         "intervalo_minutos": intervalo
     }
 
-    guardar_programacion(nueva)
+    save_scheduling(nueva)
     print("✔ Programación guardada correctamente.")
 
 # ============================================================
 # TELEGRAM
 # ============================================================
 
-TELEGRAM_TOKEN = ""
+TELEGRAM_TOKEN = "8488886057:AAH8PkpvspCgwGWNY4ImAKgJ7bf58fzpzjo"
 
 def cargar_chat_id():
-    return cargar_config().get("chat_id")
+    return load_config().get("chat_id")
 
 def guardar_chat_id(chat_id):
-    config = cargar_config()
+    config = load_config()
     config["chat_id"] = chat_id
-    guardar_config(config)
+    save_config(config)
 
 def telegram_configurado():
     """Verifica si Telegram está configurado"""
-    return cargar_chat_id() is not None
+    chat_id = load_config().get("chat_id")
+    return chat_id is not None
 
 
 def borrar_chat_id():
     """Elimina el chat_id almacenado (cierra sesión de Telegram)"""
-    config = cargar_config()
+    config = load_config()
     config["chat_id"] = None
-    guardar_config(config)
+    save_config(config)
 
 def obtener_chat_id_y_validar_codigo():
     """
     Obtiene el chat_id pero verificando que el último mensaje contenga el código de vinculación correcto
     Retorna: (chat_id, código_valido) o (None, False)
     """
-    codigo_esperado = cargar_codigo_vinculacion()
+    codigo_esperado = load_linking_code()
     
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
@@ -297,15 +298,70 @@ def obtener_chat_id():
         return None
 
 def enviar_telegram(mensaje):
-    chat_id = cargar_chat_id()
-    if not chat_id:
-        return
+    """Envía mensaje a Telegram"""
+    chat_id = load_config().get("chat_id")
+    if not chat_id or not TELEGRAM_TOKEN:
+        return False
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         data = {"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"}
-        requests.post(url, data=data)
-    except:
-        pass
+        response = requests.post(url, data=data)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Error enviando mensaje a Telegram: {e}")
+        return False
+
+def enviar_reporte_telegram(snapshot):
+    """Envía un resumen detallado del análisis al bot de Telegram"""
+    if not telegram_configurado():
+        return False
+    
+    try:
+        a = snapshot["analisis_avanzado"]
+        riesgo = a["score_detallado"]["riesgo_sistema"]
+        
+        # Emojis según riesgo
+        emoji_riesgo = "🔴" if riesgo == "ALTO" else "🟠" if riesgo == "MEDIO" else "🟢"
+        
+        mensaje = f"""
+🔍 *PRISMOV - Análisis Completo*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 {snapshot['timestamp']}
+
+⚡ *Recursos del Sistema*
+  • CPU: {snapshot['cpu_percent']:.1f}%
+  • RAM: {snapshot['ram_percent']:.1f}%
+  • Procesos Activos: {len(snapshot['procesos'])}
+
+📈 *Tendencias*
+  • CPU: {a['tendencias']['cpu']}
+  • RAM: {a['tendencias']['ram']}
+  • Promedio CPU: {a['huella_del_sistema']['cpu_promedio']:.1f}%
+  • Promedio RAM: {a['huella_del_sistema']['ram_promedio']:.1f}%
+
+{emoji_riesgo} *Evaluación de Riesgo: {riesgo}*
+
+⚙️ *Procesos Críticos (Top 3)*
+"""
+        
+        # Añadir procesos sospechosos
+        if a["sospechosos_persistentes"]:
+            for proc in a["sospechosos_persistentes"][:3]:
+                mensaje += f"  • {proc['nombre']}: {proc['ram_mb']}MB, CPU {proc['cpu']}%\n"
+        else:
+            mensaje += "  ✓ Ninguno detectado\n"
+        
+        # Añadir recomendaciones
+        mensaje += "\n💡 *Recomendaciones*\n"
+        for rec in a["recomendaciones"][:3]:
+            mensaje += f"  • {rec}\n"
+        
+        mensaje += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        return enviar_telegram(mensaje)
+    except Exception as e:
+        print(f"Error enviando reporte a Telegram: {e}")
+        return False
 
 # ============================================================
 # ANÁLISIS DEL SISTEMA
@@ -880,32 +936,14 @@ def ejecutar_analisis(historial):
     }
 
     historial.append(snapshot)
-    guardar_historial(historial)
+    save_history(historial)
 
     # Guardar reporte HTML
     filepath_reporte = guardar_reporte(snapshot)
 
     # Enviar a Telegram si está configurado
     if telegram_configurado():
-        # Crear mensaje resumido para Telegram
-        a = snapshot["analisis_avanzado"]
-        mensaje = f"""
-📊 *PRISMOV - Informe Rápido*
-📅 {snapshot["timestamp"]}
-
-🖥 *Recursos*
-• CPU: {snapshot["cpu_percent"]:.1f}%
-• RAM: {snapshot["ram_percent"]:.1f}%
-
-📈 *Tendencias*
-• CPU: {a["tendencias"]["cpu"]}
-• RAM: {a["tendencias"]["ram"]}
-
-⚠️ *Riesgo: {a["score_detallado"]["riesgo_sistema"]}*
-
-💾 Reporte completo guardado localmente.
-        """
-        enviar_telegram(mensaje)
+        enviar_reporte_telegram(snapshot)
 
     return filepath_reporte
 
@@ -916,21 +954,28 @@ def ejecutar_analisis(historial):
 # ============================================================
 
 def iniciar_modo_automatico(historial):
+    """Inicia el modo automático de análisis según programación"""
     while True:
-        prog = cargar_programacion()
+        try:
+            prog = load_scheduling()
 
-        if prog["activo"]:
-            ahora = datetime.datetime.now()
-            dia = ahora.strftime("%A").lower()
+            if prog["active"]:
+                ahora = datetime.datetime.now()
+                dia = ahora.strftime("%A").lower()
 
-            if dia in prog["dias"]:
-                h_inicio = datetime.datetime.strptime(prog["hora_inicio"], "%H:%M").time()
-                h_fin = datetime.datetime.strptime(prog["hora_fin"], "%H:%M").time()
+                if dia in prog["days"]:
+                    h_inicio = datetime.datetime.strptime(prog["start_time"], "%H:%M").time()
+                    h_fin = datetime.datetime.strptime(prog["end_time"], "%H:%M").time()
 
-                if h_inicio <= ahora.time() <= h_fin:
-                    ejecutar_analisis(historial)
+                    if h_inicio <= ahora.time() <= h_fin:
+                        print(f"🔄 Ejecutando análisis automático a las {ahora.strftime('%H:%M')}")
+                        ejecutar_analisis(historial)
 
-        time.sleep(prog["intervalo_minutos"] * 60)
+            intervalo = prog.get("interval_minutes", 60)
+            time.sleep(intervalo * 60)
+        except Exception as e:
+            print(f"Error en modo automático: {e}")
+            time.sleep(60)  # Esperar 1 minuto antes de reintentar
 
 
 # ============================================================
@@ -942,12 +987,12 @@ def main():
     print("=== PRISMOV - Sistema de Monitorización ===")
 
     # Cargar historial
-    historial = cargar_historial()
+    historial = load_history()
 
     # =============================
     # CONFIGURAR TELEGRAM SI NO EXISTE
     # =============================
-    config = cargar_config()
+    config = load_config()
 
     if config.get("chat_id") is None:
         print("\n⚠ Telegram no está configurado.")
