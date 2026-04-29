@@ -17,7 +17,6 @@ import pyqtgraph as pg
 
 import prismov2 as prismov
 
-
 # ============================================================
 # SCHEDULE CONFIGURATION WINDOW
 # ============================================================
@@ -72,13 +71,14 @@ class VentanaProgramacion(QDialog):
     def cargar_programacion(self):
         prog = prismov.load_scheduling()
 
-        for d in prog["dias"]:
+        # Use .get() to provide default values and avoid KeyErrors
+        for d in prog.get("dias", []):
             if d in self.dias_check:
                 self.dias_check[d].setChecked(True)
 
-        self.hora_inicio.setTime(QTime.fromString(prog["hora_inicio"], "HH:mm"))
-        self.hora_fin.setTime(QTime.fromString(prog["hora_fin"], "HH:mm"))
-        self.intervalo.setValue(prog["intervalo_minutos"])
+        self.hora_inicio.setTime(QTime.fromString(prog.get("hora_inicio", "00:00"), "HH:mm"))
+        self.hora_fin.setTime(QTime.fromString(prog.get("hora_fin", "23:59"), "HH:mm"))
+        self.intervalo.setValue(prog.get("intervalo_minutos", 60))
 
     def guardar(self):
         dias = [d for d, chk in self.dias_check.items() if chk.isChecked()]
@@ -117,6 +117,7 @@ class PrismovGUI(QWidget):
     def __init__(self):
         super().__init__()
 
+        self.setWindowIcon(QIcon("icon.ico"))
         self.setWindowTitle("PRISMOV - Control Panel and THD Monitoring")
         self.setGeometry(100, 100, 1200, 800)  # Larger default window
         # Allow fullscreen / maximized by default
@@ -149,7 +150,7 @@ class PrismovGUI(QWidget):
         subtitle_label.setAlignment(Qt.AlignCenter)
         sidebar_layout.addWidget(subtitle_label)
 
-        self.chk_dark = QCheckBox("🌙 Modo Oscuro")
+        self.chk_dark = QCheckBox("🌙 Dark Mode")
         self.chk_dark.stateChanged.connect(self.toggle_dark_mode)
         self.chk_dark.setFont(QFont("Arial", 11, QFont.Medium))
         sidebar_layout.addWidget(self.chk_dark)
@@ -161,12 +162,12 @@ class PrismovGUI(QWidget):
         sidebar_layout.addWidget(separator)
 
         # Botón explicación RA
-        self.btn_explicar = QPushButton("📚 Explicación RA")
+        self.btn_explicar = QPushButton("📚 RA Explanation")
         self.btn_explicar.clicked.connect(self.mostrar_explicacion_ra)
         self.btn_explicar.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_explicar)
         
-        sidebar_layout.addWidget(QLabel("🔐 Seguridad"))
+        sidebar_layout.addWidget(QLabel("🔐 Security"))
         self.btn_telegram = QPushButton("⚙️ Telegram")
         self.btn_telegram.clicked.connect(self.configurar_telegram)
         self.btn_telegram.setFont(QFont("Arial", 12, QFont.Medium))
@@ -178,14 +179,14 @@ class PrismovGUI(QWidget):
         self.btn_logout.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_logout)
 
-        sidebar_layout.addWidget(QLabel("⏱ Automatización"))
-        self.btn_prog = QPushButton("🕐 Configurar Cron")
+        sidebar_layout.addWidget(QLabel("⏱ automation"))
+        self.btn_prog = QPushButton("🕐 Configure Cron")
         self.btn_prog.clicked.connect(self.abrir_programacion)
         self.btn_prog.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_prog)
         
         sidebar_layout.addWidget(QLabel("☁️ Cloud"))
-        self.btn_auto = QPushButton("🚀 Modo Automático")
+        self.btn_auto = QPushButton("🚀 Automatic")
         self.btn_auto.clicked.connect(self.iniciar_modo_automatico)
         self.btn_auto.setFont(QFont("Arial", 12, QFont.Medium))
         sidebar_layout.addWidget(self.btn_auto)
@@ -212,7 +213,7 @@ class PrismovGUI(QWidget):
         content_layout.setContentsMargins(50, 50, 50, 50)
         content_layout.setSpacing(32)
 
-        header_label = QLabel("🎯 Dashboard de Monitoreo en Tiempo Real")
+        header_label = QLabel("🎯 Dashboard of Real Time Monitoring")
         header_label.setObjectName("headerLabel")
         header_label.setFont(QFont("Arial", 32, QFont.Bold))
         content_layout.addWidget(header_label)
@@ -274,7 +275,7 @@ class PrismovGUI(QWidget):
         graph_card = QFrame()
         graph_card.setObjectName("card")
         graph_layout = QVBoxLayout()
-        graph_title = QLabel("📈 Tendencia Histórica de Consumo (Último Minuto)")
+        graph_title = QLabel("📈 Historical Consumption Trends (Last Minute)")
         graph_title.setObjectName("cardTitle")
         graph_layout.addWidget(graph_title)
 
@@ -1029,6 +1030,7 @@ class PrismovGUI(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon("icon.ico"))
     ventana = PrismovGUI()
     ventana.show()
     sys.exit(app.exec_())
