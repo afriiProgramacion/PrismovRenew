@@ -238,7 +238,7 @@ def configurar_programacion_consola():
 # TELEGRAM
 # ============================================================
 
-TELEGRAM_TOKEN = "8488886057:AAH8PkpvspCgwGWNY4ImAKgJ7bf58fzpzjo"
+TELEGRAM_TOKEN = ""
 
 def cargar_chat_id():
     return load_config().get("chat_id")
