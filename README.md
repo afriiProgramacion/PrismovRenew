@@ -29,6 +29,7 @@ PRISMOV is a professional desktop application designed to monitor industrial sys
 
 ## Demo
 *(Since this is a desktop GUI built with PyQt5, a web demo via Streamlit is not directly applicable. However, the core logic in `prismov.py` can be easily decoupled and hosted via FastAPI + Streamlit in future releases.)*
+If you want to use demo web, you need to install streamlit at your VSCODE, and then execute this command: **streamlit run web_demo**
 
 
 ## Linkedin
